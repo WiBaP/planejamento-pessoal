@@ -1,40 +1,81 @@
+<!-- Barra principal -->
+<div class="routine-toolbar">
+  <div class="date-row">
+    <span id="sel-date-label" class="date-label"></span>
+    <button type="button" class="cal-toggle" id="cal-toggle-btn" onclick="toggleCalendar()">Calendario</button>
+  </div>
+  <div class="routine-toolbar-actions meta-toolbar-actions">
+    <input type="text" id="meta-search" placeholder="Pesquisar Meta, Categoria Ou Tarefa" oninput="onMetaSearchInput()">
+    <button type="button" class="btn btn-primary" onclick="toggleCategoryForm()">Nova Categoria</button>
+    <button type="button" class="btn btn-primary" onclick="toggleMetaForm()">Nova Meta</button>
+  </div>
+</div>
+
+<div class="calendar" id="calendar-panel">
+  <div class="cal-header">
+    <button type="button" class="cal-nav" onclick="prevMonth()">&lsaquo;</button>
+    <span id="cal-month-label"></span>
+    <button type="button" class="cal-nav" onclick="nextMonth()">&rsaquo;</button>
+  </div>
+  <div class="cal-weekdays">
+    <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span>
+    <span>Sex</span><span>Sab</span><span>Dom</span>
+  </div>
+  <div id="cal-grid"></div>
+</div>
+
+<!-- Formulario de categoria -->
+<div class="card task-form-card meta-form-card" id="category-form-card" style="display:none;">
+  <div class="stitle">Nova Categoria</div>
+  <div class="form-row">
+    <input type="text" id="cat-nome" placeholder="Nome Da Categoria" class="flex1">
+    <select id="cat-cor" style="width:120px;">
+      <option value="blue">Azul</option>
+      <option value="green">Verde</option>
+      <option value="purple">Roxo</option>
+      <option value="yellow">Amarelo</option>
+      <option value="pink">Rosa</option>
+      <option value="cyan">Ciano</option>
+      <option value="orange">Laranja</option>
+      <option value="red">Vermelho</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <textarea id="cat-comentario" placeholder="Comentario Da Categoria" class="flex1"></textarea>
+  </div>
+  <div class="form-row">
+    <button type="button" class="btn btn-primary" id="cat-submit-button" onclick="addCategoria()">Criar Categoria</button>
+    <button type="button" class="btn" onclick="closeCategoryForm()">Fechar</button>
+  </div>
+  <div class="form-help">Use categorias para agrupar metas por area da vida, projeto ou tipo de acompanhamento.</div>
+</div>
+
+<!-- Formulario de meta -->
+<div class="card task-form-card meta-form-card" id="meta-form-card" style="display:none;">
+  <div class="stitle">Nova Meta</div>
+  <div class="form-row">
+    <select id="m-cat" style="width:160px;"></select>
+    <input type="text" id="m-titulo" placeholder="Titulo" class="flex1">
+    <input type="number" id="m-alvo" placeholder="Meta" min="1" step="0.5" style="width:75px;">
+    <select id="m-unidade" style="width:105px;">
+      <option value="horas">Horas</option>
+      <option value="vezes">Vezes</option>
+      <option value="km">Km</option>
+      <option value="min">Minutos</option>
+    </select>
+    <select id="m-prazo" style="width:105px;">
+      <option value="mensal">Mensal</option>
+      <option value="semanal">Semanal</option>
+      <option value="anual">Anual</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <button type="button" class="btn btn-primary" id="meta-submit-button" onclick="addMeta()">Salvar Meta</button>
+    <button type="button" class="btn" onclick="closeMetaForm()">Fechar</button>
+  </div>
+  <div class="form-help">O progresso considera a semana ou o mes da data selecionada no calendario.</div>
+</div>
+
 <!-- Resumo e lista de categorias -->
 <div id="metas-overview" class="metrics" style="display:none;"></div>
 <div id="cat-list"></div>
-
-<!-- Formulário de categoria -->
-<div class="stitle">Nova Categoria</div>
-<div class="form-row">
-  <input type="text" id="cat-nome" placeholder="Nome Da Categoria" class="flex1">
-  <select id="cat-cor" style="width:120px;">
-    <option value="blue">Azul</option>
-    <option value="green">Verde</option>
-    <option value="purple">Roxo</option>
-    <option value="yellow">Amarelo</option>
-    <option value="pink">Rosa</option>
-    <option value="cyan">Ciano</option>
-    <option value="orange">Laranja</option>
-    <option value="red">Vermelho</option>
-  </select>
-  <button type="button" class="btn btn-primary" onclick="addCategoria()">Criar</button>
-</div>
-
-<!-- Formulário de meta -->
-<div class="stitle">Nova Meta</div>
-<div class="form-row">
-  <select id="m-cat" style="width:160px;"></select>
-  <input type="text" id="m-titulo" placeholder="Título" class="flex1">
-  <input type="number" id="m-alvo" placeholder="Meta" min="1" step="0.5" style="width:75px;">
-  <select id="m-unidade" style="width:105px;">
-    <option value="horas">Horas</option>
-    <option value="vezes">Vezes</option>
-    <option value="km">Km</option>
-    <option value="paginas">Paginas</option>
-    <option value="min">Minutos</option>
-  </select>
-  <select id="m-prazo" style="width:105px;">
-    <option value="mensal">Mensal</option>
-    <option value="semanal">Semanal</option>
-  </select>
-  <button type="button" class="btn btn-primary" onclick="addMeta()">Adicionar</button>
-</div>

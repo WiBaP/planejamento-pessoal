@@ -46,6 +46,7 @@
       <option value="diario">Diária</option>
       <option value="semanal">Semanal Flexível</option>
       <option value="mensal">Mensal Flexível</option>
+      <option value="anual">Anual Flexivel</option>
       <option value="unica">Somente Nesta Data</option>
     </select>
   </div>
@@ -60,6 +61,16 @@
 
   <div class="form-row" id="monthly-date-wrap" style="display:none;">
     <input type="date" id="t-data-mensal" style="width:170px;">
+  </div>
+
+  <div class="form-row" id="annual-wrap" style="display:none;">
+    <select id="t-anual-modo" style="width:150px;" onchange="onTaskTypeChange()">
+      <option value="flexivel">Anual Flexivel</option>
+      <option value="mes">Escolher Mes</option>
+      <option value="dia">Escolher Dia</option>
+    </select>
+    <input type="month" id="t-mes-anual" style="width:150px;display:none;">
+    <input type="date" id="t-data-anual" style="width:170px;display:none;">
   </div>
 
   <div class="form-row" id="time-wrap">
@@ -118,3 +129,11 @@
   </button>
 </div>
 <div class="card"><div id="mensal-list"></div></div>
+
+<div class="section-header">
+  <button type="button" class="section-toggle" onclick="toggleSectionCollapse('anual')" title="Minimizar">
+    <span>Tarefas Anuais</span>
+    <span class="section-arrow">â–¾</span>
+  </button>
+</div>
+<div class="card"><div id="anual-list"></div></div>

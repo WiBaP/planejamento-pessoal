@@ -40,6 +40,8 @@ function normalizeTask(raw) {
     diasSemana: Array.isArray(raw?.diasSemana) ? raw.diasSemana.map(Number).filter(Boolean) : [1, 2, 3, 4, 5, 6, 7],
     dataUnica: raw?.dataUnica || null,
     dataMensal: raw?.dataMensal || null,
+    dataAnual: raw?.dataAnual || null,
+    mesAnual: raw?.mesAnual || null,
     comentario: raw?.comentario || '',
     startDate: raw?.startDate || getToday(),
     endDate: raw?.endDate || null,
@@ -51,7 +53,9 @@ function normalizeState(raw) {
   if (!raw || typeof raw !== 'object') return base;
 
   base.categorias = Array.isArray(raw.categorias) ? raw.categorias : [];
-  base.metas = Array.isArray(raw.metas) ? raw.metas : [];
+  base.metas = Array.isArray(raw.metas)
+    ? raw.metas.map(meta => ({ ...meta, unidade: meta?.unidade === 'paginas' ? 'vezes' : meta?.unidade }))
+    : [];
   base.tarefas = Array.isArray(raw.tarefas) ? raw.tarefas.map(normalizeTask) : [];
   base.registros = Array.isArray(raw.registros) ? raw.registros : [];
   base.sessoes = Array.isArray(raw.sessoes) ? raw.sessoes : [];
@@ -95,17 +99,24 @@ const uiState = {
   feedbackTimer: null,
   actionFeedbackTimer: null,
   progressoAnterior: {},
-  rotinaBusca: '',
+  buscaCompartilhada: '',
   rotinaFiltro: 'todas',
   rotinaFormularioAberto: false,
+  categoriaFormularioAberto: false,
+  metaFormularioAberto: false,
   editandoTarefaId: null,
+  editandoCategoriaId: null,
+  editandoMetaId: null,
   secoesMinimizadas: {
     unica: false,
     diario: false,
     semanal: false,
     mensal: false,
+    anual: false,
   },
   comentariosMinimizados: {},
+  categoriasMinimizadas: {},
+  tarefasConcluidasExpandidas: {},
 };
 
 function getState() {
@@ -230,6 +241,7 @@ const dataService = {
         id: createId(),
         tarefaId: taskId,
         data: registroKey,
+        completedDate: status === 'feito' ? dateKey : null,
         status,
         completedAt: status === 'feito' ? formatCurrentTime() : null,
         duracaoMinutos: null,
@@ -238,6 +250,7 @@ const dataService = {
       store.registros = store.registros.filter(item => !(item.tarefaId === taskId && item.data === registroKey));
     } else {
       registro.status = status;
+      registro.completedDate = status === 'feito' ? dateKey : null;
       registro.completedAt = status === 'feito' ? formatCurrentTime() : null;
     }
 
@@ -256,6 +269,7 @@ const dataService = {
         id: createId(),
         tarefaId: taskId,
         data: registroKey,
+        completedDate: dateKey,
         status: 'feito',
         completedAt: formatCurrentTime(),
         duracaoMinutos: durationMinutes,
@@ -265,7 +279,10 @@ const dataService = {
       registro.duracaoMinutos = durationMinutes;
       if (!registro.status) {
         registro.status = 'feito';
+        registro.completedDate = dateKey;
         registro.completedAt = formatCurrentTime();
+      } else if (registro.status === 'feito' && !registro.completedDate) {
+        registro.completedDate = dateKey;
       }
     }
 
@@ -274,6 +291,13 @@ const dataService = {
 
   addCategory(payload) {
     store.categorias.push({ id: createId(), ...payload });
+    schedulePersist();
+  },
+
+  updateCategory(categoryId, payload) {
+    const categoria = store.categorias.find(item => item.id === categoryId);
+    if (!categoria) throw new Error('Categoria não encontrada para editar.');
+    Object.assign(categoria, payload);
     schedulePersist();
   },
 
@@ -294,6 +318,13 @@ const dataService = {
 
   addMeta(payload) {
     store.metas.push({ id: createId(), ...payload });
+    schedulePersist();
+  },
+
+  updateMeta(metaId, payload) {
+    const meta = store.metas.find(item => item.id === metaId);
+    if (!meta) throw new Error('Meta não encontrada para editar.');
+    Object.assign(meta, payload);
     schedulePersist();
   },
 
@@ -333,6 +364,18 @@ function getToday() {
 
 function formatMoney(value) {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatDateShort(dateStr) {
+  if (!dateStr) return '';
+  return new Date(`${dateStr}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatMonthLabel(monthStr) {
+  if (!monthStr) return '';
+  const date = new Date(`${monthStr}-01T12:00:00`);
+  const label = date.toLocaleDateString('pt-BR', { month: 'long' });
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
 }
 
 function escapeHtml(value) {
@@ -386,8 +429,17 @@ function getMonthEnd(dateStr) {
   return lastDay.toISOString().slice(0, 10);
 }
 
+function getYearStart(dateStr) {
+  return `${dateStr.slice(0, 4)}-01-01`;
+}
+
+function getYearEnd(dateStr) {
+  return `${dateStr.slice(0, 4)}-12-31`;
+}
+
 function getRangeForPrazo(prazo, dateStr = getToday()) {
   if (prazo === 'semanal') return { start: getWeekStart(dateStr), end: getWeekEnd(dateStr) };
+  if (prazo === 'anual') return { start: getYearStart(dateStr), end: getYearEnd(dateStr) };
   return { start: getMonthStart(dateStr), end: getMonthEnd(dateStr) };
 }
 
@@ -414,6 +466,22 @@ function getTaskStartDate(payload, baseDate) {
     }
     const nextMonthCandidate = new Date(base.getFullYear(), base.getMonth() + 1, selectedDay);
     return nextMonthCandidate.toISOString().slice(0, 10);
+  }
+
+  if (payload.recorrencia === 'anual') {
+    if (payload.dataAnual) {
+      const selectedMonthDay = payload.dataAnual.slice(5);
+      const currentYearCandidate = `${baseDate.slice(0, 4)}-${selectedMonthDay}`;
+      if (currentYearCandidate >= baseDate) return currentYearCandidate;
+      return `${Number(baseDate.slice(0, 4)) + 1}-${selectedMonthDay}`;
+    }
+
+    if (payload.mesAnual) {
+      const selectedMonth = payload.mesAnual.slice(5, 7);
+      const currentYearCandidate = `${baseDate.slice(0, 4)}-${selectedMonth}-01`;
+      if (currentYearCandidate >= getMonthStart(baseDate)) return currentYearCandidate;
+      return `${Number(baseDate.slice(0, 4)) + 1}-${selectedMonth}-01`;
+    }
   }
 
   return baseDate;
@@ -469,6 +537,7 @@ function minutesToDecimalHours(totalMinutes) {
 function getTaskProgressKey(tarefa, selectedDate) {
   if (tarefa.recorrencia === 'semanal') return getWeekStart(selectedDate);
   if (tarefa.recorrencia === 'mensal') return getMonthStart(selectedDate);
+  if (tarefa.recorrencia === 'anual') return getYearStart(selectedDate);
   if (tarefa.recorrencia === 'unica') return tarefa.dataUnica;
   return selectedDate;
 }
@@ -504,6 +573,10 @@ function taskOccursOnDate(tarefa, dateKey) {
   }
 
   if (tarefa.recorrencia === 'unica') return tarefa.dataUnica === dateKey;
+  if (tarefa.recorrencia === 'anual') {
+    if (tarefa.dataAnual) return tarefa.dataAnual.slice(5) === dateKey.slice(5);
+    if (tarefa.mesAnual) return tarefa.mesAnual.slice(5, 7) === dateKey.slice(5, 7);
+  }
   return true;
 }
 
@@ -586,6 +659,11 @@ function getRecurrenceLabel(tarefa) {
   if (tarefa.recorrencia === 'mensal') {
     return tarefa.dataMensal ? `Mês: dia ${tarefa.dataMensal.slice(-2)}` : 'Mensal Flexível';
   }
+  if (tarefa.recorrencia === 'anual') {
+    if (tarefa.dataAnual) return `Anual: ${formatDateShort(tarefa.dataAnual)}`;
+    if (tarefa.mesAnual) return `Anual: ${formatMonthLabel(tarefa.mesAnual)}`;
+    return 'Anual FlexÃ­vel';
+  }
   if (tarefa.recorrencia === 'unica') return 'Somente Nesta Data';
 
   const dias = tarefa.diasSemana?.length ? tarefa.diasSemana : [1, 2, 3, 4, 5, 6, 7];
@@ -597,6 +675,7 @@ function getTaskTypeLabel(tarefa) {
   if (tarefa.recorrencia === 'unica') return 'Desta Data';
   if (tarefa.recorrencia === 'semanal') return 'Semanal';
   if (tarefa.recorrencia === 'mensal') return 'Mensal';
+  if (tarefa.recorrencia === 'anual') return 'Anual';
   return 'Diária';
 }
 
@@ -624,6 +703,11 @@ function getTaskHighlightFlags(tarefa, dateKey) {
     const currentDay = Number(dateKey.slice(-2));
     const monthlyDay = Number(tarefa.dataMensal.slice(-2));
     return [{ label: `Dia ${String(monthlyDay).padStart(2, '0')}`, active: currentDay === monthlyDay }];
+  }
+
+  if (tarefa.recorrencia === 'anual') {
+    if (tarefa.dataAnual) return [{ label: formatDateShort(tarefa.dataAnual), active: tarefa.dataAnual.slice(5) === dateKey.slice(5) }];
+    if (tarefa.mesAnual) return [{ label: formatMonthLabel(tarefa.mesAnual), active: tarefa.mesAnual.slice(5, 7) === dateKey.slice(5, 7) }];
   }
 
   if (tarefa.recorrencia === 'unica' && tarefa.dataUnica) {
@@ -655,6 +739,15 @@ function validateTaskCanBeMarked(tarefa, dateKey) {
     const currentDay = Number(dateKey.slice(-2));
     if (expectedDay !== currentDay) {
       throw new Error(`Essa tarefa só pode ser marcada no dia ${String(expectedDay).padStart(2, '0')} de cada mês.`);
+    }
+  }
+  if (tarefa.recorrencia === 'anual') {
+    if (tarefa.dataAnual && tarefa.dataAnual.slice(5) !== dateKey.slice(5)) {
+      throw new Error(`Essa tarefa sÃ³ pode ser marcada em ${formatDateShort(tarefa.dataAnual).slice(0, 5)} de cada ano.`);
+    }
+
+    if (tarefa.mesAnual && tarefa.mesAnual.slice(5, 7) !== dateKey.slice(5, 7)) {
+      throw new Error(`Essa tarefa sÃ³ pode ser marcada em ${formatMonthLabel(tarefa.mesAnual)}.`);
     }
   }
 }
@@ -808,10 +901,7 @@ function selectDate(dateValue) {
   const button = document.getElementById('cal-toggle-btn');
   if (panel) panel.classList.remove('open');
   if (button) button.classList.remove('open');
-  renderCalendar();
-  renderTaskLists();
-  updateSelectedDateLabel();
-  syncSingleDateInput();
+  renderCurrentPage();
 }
 
 function updateSelectedDateLabel() {
@@ -896,7 +986,7 @@ function syncRoutineUI() {
   const closeButton = document.getElementById('task-close-form');
   const cancelButton = document.getElementById('task-cancel-edit');
 
-  if (searchInput) searchInput.value = uiState.rotinaBusca;
+  if (searchInput) searchInput.value = uiState.buscaCompartilhada;
   if (formCard) formCard.style.display = uiState.rotinaFormularioAberto ? '' : 'none';
   if (submitButton) submitButton.textContent = uiState.editandoTarefaId ? 'Salvar Alterações' : 'Salvar Tarefa';
   if (closeButton) closeButton.style.display = uiState.editandoTarefaId ? 'none' : '';
@@ -905,7 +995,7 @@ function syncRoutineUI() {
     button.classList.toggle('active', button.getAttribute('onclick')?.includes(`'${uiState.rotinaFiltro}'`));
   });
 
-  ['unica', 'diario', 'semanal', 'mensal'].forEach(section => {
+  ['unica', 'diario', 'semanal', 'mensal', 'anual'].forEach(section => {
     const list = document.getElementById(`${section}-list`);
     const button = document.querySelector(`button[onclick="toggleSectionCollapse('${section}')"]`);
     if (list) {
@@ -944,8 +1034,14 @@ function toggleTaskComment(taskId) {
 
 function onTaskSearchInput() {
   const input = document.getElementById('task-search');
-  uiState.rotinaBusca = input?.value?.trim().toLowerCase() || '';
+  uiState.buscaCompartilhada = input?.value?.trim().toLowerCase() || '';
   renderTaskLists();
+}
+
+function onMetaSearchInput() {
+  const input = document.getElementById('meta-search');
+  uiState.buscaCompartilhada = input?.value?.trim().toLowerCase() || '';
+  renderMetas();
 }
 
 function setTaskFilter(filter) {
@@ -963,6 +1059,9 @@ function resetTaskForm() {
   document.getElementById('t-rec').value = 'diario';
   document.getElementById('t-data-unica').value = uiState.dataSelecionada;
   document.getElementById('t-data-mensal').value = uiState.dataSelecionada;
+  document.getElementById('t-anual-modo').value = 'flexivel';
+  document.getElementById('t-data-anual').value = uiState.dataSelecionada;
+  document.getElementById('t-mes-anual').value = uiState.dataSelecionada.slice(0, 7);
   document.querySelectorAll('#weekday-selector input').forEach(input => {
     input.checked = true;
   });
@@ -990,6 +1089,9 @@ function startEditTask(taskId) {
   document.getElementById('t-comentario').value = tarefa.comentario || '';
   document.getElementById('t-data-unica').value = tarefa.dataUnica || uiState.dataSelecionada;
   document.getElementById('t-data-mensal').value = tarefa.dataMensal || uiState.dataSelecionada;
+  document.getElementById('t-anual-modo').value = tarefa.dataAnual ? 'dia' : (tarefa.mesAnual ? 'mes' : 'flexivel');
+  document.getElementById('t-data-anual').value = tarefa.dataAnual || uiState.dataSelecionada;
+  document.getElementById('t-mes-anual').value = tarefa.mesAnual || uiState.dataSelecionada.slice(0, 7);
 
   const selectedDays = tarefa.diasSemana?.length ? tarefa.diasSemana : [1, 2, 3, 4, 5, 6, 7];
   document.querySelectorAll('#weekday-selector input').forEach(input => {
@@ -1047,6 +1149,10 @@ function syncSingleDateInput() {
   if (input && !input.value) input.value = uiState.dataSelecionada;
   const monthlyInput = document.getElementById('t-data-mensal');
   if (monthlyInput && !monthlyInput.value) monthlyInput.value = uiState.dataSelecionada;
+  const annualDateInput = document.getElementById('t-data-anual');
+  if (annualDateInput && !annualDateInput.value) annualDateInput.value = uiState.dataSelecionada;
+  const annualMonthInput = document.getElementById('t-mes-anual');
+  if (annualMonthInput && !annualMonthInput.value) annualMonthInput.value = uiState.dataSelecionada.slice(0, 7);
 }
 
 function onTaskTypeChange() {
@@ -1055,19 +1161,26 @@ function onTaskTypeChange() {
   const timeWrap = document.getElementById('time-wrap');
   const singleDateWrap = document.getElementById('single-date-wrap');
   const monthlyDateWrap = document.getElementById('monthly-date-wrap');
+  const annualWrap = document.getElementById('annual-wrap');
+  const annualMode = document.getElementById('t-anual-modo')?.value || 'flexivel';
+  const annualDateInput = document.getElementById('t-data-anual');
+  const annualMonthInput = document.getElementById('t-mes-anual');
   const helper = document.getElementById('task-type-help');
   const startInput = document.getElementById('t-inicio');
   const endInput = document.getElementById('t-fim');
   const monthlyDateInput = document.getElementById('t-data-mensal');
 
-  if (!recurrence || !weekdayWrap || !timeWrap || !singleDateWrap || !monthlyDateWrap || !helper || !startInput || !endInput || !monthlyDateInput) return;
+  if (!recurrence || !weekdayWrap || !timeWrap || !singleDateWrap || !monthlyDateWrap || !annualWrap || !annualDateInput || !annualMonthInput || !helper || !startInput || !endInput || !monthlyDateInput) return;
 
   weekdayWrap.style.display = recurrence === 'diario' || recurrence === 'semanal' ? '' : 'none';
   timeWrap.style.display = recurrence === 'diario' || recurrence === 'unica' ? '' : 'none';
   singleDateWrap.style.display = recurrence === 'unica' ? '' : 'none';
   monthlyDateWrap.style.display = recurrence === 'mensal' ? '' : 'none';
+  annualWrap.style.display = recurrence === 'anual' ? '' : 'none';
+  annualDateInput.style.display = recurrence === 'anual' && annualMode === 'dia' ? '' : 'none';
+  annualMonthInput.style.display = recurrence === 'anual' && annualMode === 'mes' ? '' : 'none';
 
-  if (recurrence === 'semanal' || recurrence === 'mensal') {
+  if (recurrence === 'semanal' || recurrence === 'mensal' || recurrence === 'anual') {
     startInput.value = '';
     endInput.value = '';
   }
@@ -1076,9 +1189,13 @@ function onTaskTypeChange() {
     monthlyDateInput.value = uiState.dataSelecionada;
   }
 
+  if (recurrence === 'anual' && !annualDateInput.value) annualDateInput.value = uiState.dataSelecionada;
+  if (recurrence === 'anual' && !annualMonthInput.value) annualMonthInput.value = uiState.dataSelecionada.slice(0, 7);
+
   if (recurrence === 'diario') helper.textContent = 'A tarefa aparece somente nos dias da semana marcados abaixo.';
   if (recurrence === 'semanal') helper.textContent = 'Tarefa semanal: marque os dias de referência se quiser. Ela continua valendo para a semana inteira e reinicia toda segunda-feira.';
   if (recurrence === 'mensal') helper.textContent = 'Tarefa mensal: a data de referência é opcional. Se escolher uma data, esse dia fica destacado no mês.';
+  if (recurrence === 'anual') helper.textContent = 'Tarefa anual: pode valer para o ano inteiro, para um mes especifico ou para um dia fixo do ano.';
   if (recurrence === 'unica') helper.textContent = 'Tarefa de uma data específica. Ela aparece somente no dia escolhido.';
 }
 
@@ -1187,10 +1304,11 @@ function renderTaskLists() {
   const diarioList = document.getElementById('diario-list');
   const semanalList = document.getElementById('semanal-list');
   const mensalList = document.getElementById('mensal-list');
-  if (!oneOffList || !diarioList || !semanalList || !mensalList) return;
+  const anualList = document.getElementById('anual-list');
+  if (!oneOffList || !diarioList || !semanalList || !mensalList || !anualList) return;
 
   const matchesSearch = tarefa => {
-    if (!uiState.rotinaBusca) return true;
+    if (!uiState.buscaCompartilhada) return true;
     const meta = tarefa.metaId ? store.metas.find(item => item.id === tarefa.metaId) : null;
     const categoria = meta ? store.categorias.find(item => item.id === meta.catId) : null;
     const haystack = [
@@ -1200,7 +1318,7 @@ function renderTaskLists() {
       meta?.titulo || '',
       categoria?.nome || '',
     ].join(' ').toLowerCase();
-    return haystack.includes(uiState.rotinaBusca);
+    return haystack.includes(uiState.buscaCompartilhada);
   };
 
   const occursToday = item => taskOccursOnDate(item, uiState.dataSelecionada);
@@ -1213,6 +1331,7 @@ function renderTaskLists() {
   const diarias = sortTasksByStatus(store.tarefas.filter(item => item.recorrencia === 'diario' && visibleInList(item)), uiState.dataSelecionada);
   const semanais = sortTasksByStatus(store.tarefas.filter(item => item.recorrencia === 'semanal' && visibleInList(item)), uiState.dataSelecionada);
   const mensais = sortTasksByStatus(store.tarefas.filter(item => item.recorrencia === 'mensal' && visibleInList(item)), uiState.dataSelecionada);
+  const anuais = sortTasksByStatus(store.tarefas.filter(item => item.recorrencia === 'anual' && visibleInList(item)), uiState.dataSelecionada);
 
   oneOffList.innerHTML = buildSectionProgress('unica', doDia, true) + (
     doDia.length
@@ -1238,6 +1357,12 @@ function renderTaskLists() {
       : '<div class="empty-state">Nenhuma Tarefa Mensal.</div>'
   );
 
+  anualList.innerHTML = buildSectionProgress('anual', anuais, true) + (
+    anuais.length
+      ? anuais.map(item => buildTaskItem(item, uiState.dataSelecionada)).join('')
+      : '<div class="empty-state">Nenhuma Tarefa Anual.</div>'
+  );
+
   decorateTaskCards();
   animateRoutineProgress();
   syncRoutineUI();
@@ -1245,11 +1370,7 @@ function renderTaskLists() {
 
 function decorateTaskCards() {
   document.querySelectorAll('.task-item').forEach(card => {
-    const deleteButton = card.querySelector('.del-btn');
-    if (!deleteButton) return;
-
-    const match = deleteButton.getAttribute('onclick')?.match(/delTarefa\('([^']+)'\)/);
-    const taskId = match?.[1];
+    const taskId = card.dataset.taskId;
     if (!taskId) return;
 
     const tarefa = store.tarefas.find(item => item.id === taskId);
@@ -1257,15 +1378,6 @@ function decorateTaskCards() {
 
     const badge = card.querySelector('.task-meta-row .badge-purple');
     if (badge) badge.textContent = getTaskTypeLabel(tarefa);
-
-    if (!card.querySelector('.task-edit-btn')) {
-      const editButton = document.createElement('button');
-      editButton.type = 'button';
-      editButton.className = 'btn-sm task-edit-btn';
-      editButton.textContent = 'Editar';
-      editButton.onclick = () => startEditTask(taskId);
-      deleteButton.parentNode.insertBefore(editButton, deleteButton);
-    }
   });
 }
 
@@ -1319,9 +1431,8 @@ function buildTaskItem(tarefa, viewDate) {
   const durationEditor = true
     ? `
       <div class="dur-area">
-        <button type="button" class="btn-sm" onclick="toggleDur('${tarefa.id}')">
-          Tempo ${registro?.duracaoMinutos ? formatMinutes(registro.duracaoMinutos) : ''}
-        </button>
+        <button type="button" class="icon-btn" onclick="toggleDur('${tarefa.id}')" title="Registrar Tempo">◷</button>
+        ${registro?.duracaoMinutos ? `<span class="duration-chip">${formatMinutes(registro.duracaoMinutos)}</span>` : ''}
         <div id="dur-${tarefa.id}" class="dur-inline">
           <input type="time" id="durv-${tarefa.id}" value="${registro?.duracaoMinutos ? String(Math.floor(registro.duracaoMinutos / 60)).padStart(2, '0') + ':' + String(registro.duracaoMinutos % 60).padStart(2, '0') : ''}" class="dur-input-time">
           <button type="button" class="btn-sm" onclick="saveDur('${tarefa.id}')">Ok</button>
@@ -1350,8 +1461,11 @@ function buildTaskItem(tarefa, viewDate) {
         ${metaBlock}
         ${commentBlock}
       </div>
-      ${durationEditor}
-      <button type="button" class="del-btn" onclick="delTarefa('${tarefa.id}')">×</button>
+      <div class="task-actions">
+        <button type="button" class="icon-btn" onclick="startEditTask('${tarefa.id}')" title="Editar Tarefa">✎</button>
+        ${durationEditor}
+        <button type="button" class="del-btn" onclick="delTarefa('${tarefa.id}')">×</button>
+      </div>
     </div>
   `;
 }
@@ -1393,26 +1507,41 @@ function addTarefa() {
     }
 
     const selectedWeekdays = getSelectedWeekdays();
+    const annualMode = document.getElementById('t-anual-modo')?.value || 'flexivel';
+    const annualDate = recurrence === 'anual' && annualMode === 'dia' ? (document.getElementById('t-data-anual').value || uiState.dataSelecionada) : null;
+    const annualMonth = recurrence === 'anual' && annualMode === 'mes' ? (document.getElementById('t-mes-anual').value || uiState.dataSelecionada.slice(0, 7)) : null;
     const payload = {
       nome,
       metaId,
       recorrencia: recurrence,
-      inicio: recurrence === 'semanal' || recurrence === 'mensal' ? null : inicio,
-      fim: recurrence === 'semanal' || recurrence === 'mensal' ? null : fim,
+      inicio: recurrence === 'semanal' || recurrence === 'mensal' || recurrence === 'anual' ? null : inicio,
+      fim: recurrence === 'semanal' || recurrence === 'mensal' || recurrence === 'anual' ? null : fim,
       diasSemana: recurrence === 'diario' || recurrence === 'semanal' ? selectedWeekdays : [],
       dataUnica: recurrence === 'unica' ? (document.getElementById('t-data-unica').value || uiState.dataSelecionada) : null,
       dataMensal: recurrence === 'mensal' ? (document.getElementById('t-data-mensal').value || null) : null,
+      dataAnual: recurrence === 'anual' ? annualDate : null,
+      mesAnual: recurrence === 'anual' ? annualMonth : null,
       comentario: document.getElementById('t-comentario').value.trim(),
       startDate: getTaskStartDate({
         recorrencia: recurrence,
         diasSemana: recurrence === 'diario' || recurrence === 'semanal' ? selectedWeekdays : [],
         dataUnica: recurrence === 'unica' ? (document.getElementById('t-data-unica').value || uiState.dataSelecionada) : null,
         dataMensal: recurrence === 'mensal' ? (document.getElementById('t-data-mensal').value || null) : null,
+        dataAnual: recurrence === 'anual' ? annualDate : null,
+        mesAnual: recurrence === 'anual' ? annualMonth : null,
       }, uiState.dataSelecionada),
     };
 
     if (recurrence === 'unica' && !payload.dataUnica) {
       throw new Error('Escolha a data da tarefa única.');
+    }
+
+    if (recurrence === 'anual' && annualMode === 'dia' && !payload.dataAnual) {
+      throw new Error('Escolha a data anual da tarefa.');
+    }
+
+    if (recurrence === 'anual' && annualMode === 'mes' && !payload.mesAnual) {
+      throw new Error('Escolha o mes anual da tarefa.');
     }
 
     if (recurrence === 'diario' && !payload.diasSemana.length) {
@@ -1433,6 +1562,9 @@ function addTarefa() {
     document.getElementById('t-data-unica').value = uiState.dataSelecionada;
     const monthlyDateInput = document.getElementById('t-data-mensal');
     if (monthlyDateInput) monthlyDateInput.value = uiState.dataSelecionada;
+    document.getElementById('t-anual-modo').value = 'flexivel';
+    document.getElementById('t-data-anual').value = uiState.dataSelecionada;
+    document.getElementById('t-mes-anual').value = uiState.dataSelecionada.slice(0, 7);
     document.querySelectorAll('#weekday-selector input').forEach(input => {
       input.checked = true;
     });
@@ -1456,41 +1588,189 @@ function renderMetas() {
   const categoryList = document.getElementById('cat-list');
   if (!categorySelect || !overview || !categoryList) return;
 
+  renderCalendar();
+  updateSelectedDateLabel();
+  syncMetasUI();
+
   categorySelect.innerHTML = store.categorias.length
     ? store.categorias.map(item => `<option value="${item.id}">${escapeHtml(item.nome)}</option>`).join('')
     : '<option value="">Crie Uma Categoria Primeiro</option>';
 
+  const visibleCategories = getVisibleCategoriesForMetas();
+  const visibleMetas = visibleCategories.flatMap(categoria => getVisibleMetasForCategory(categoria));
+
   if (!store.metas.length) {
     overview.style.display = 'none';
   } else {
-    const completed = store.metas.filter(item => getMetaProgress(item.id, item.prazo) >= item.alvo).length;
+    const completed = visibleMetas.filter(item => getMetaProgress(item.id, item.prazo, uiState.dataSelecionada) >= item.alvo).length;
     overview.style.display = 'grid';
     overview.innerHTML = `
-      <div class="metric"><div class="metric-label">Metas Ativas</div><div class="metric-value">${store.metas.length}</div></div>
+      <div class="metric"><div class="metric-label">Metas Visiveis</div><div class="metric-value">${visibleMetas.length}</div></div>
       <div class="metric"><div class="metric-label">Concluídas</div><div class="metric-value success">${completed}</div></div>
-      <div class="metric"><div class="metric-label">Categorias</div><div class="metric-value metric-small">${store.categorias.length}</div></div>
+      <div class="metric"><div class="metric-label">Categorias</div><div class="metric-value metric-small">${visibleCategories.length}</div></div>
     `;
   }
 
-  categoryList.innerHTML = store.categorias.length
-    ? store.categorias.map(buildCategoryCard).join('')
-    : '<div class="empty-state">Nenhuma Categoria Ainda.</div>';
+  categoryList.innerHTML = visibleCategories.length
+    ? visibleCategories.map(buildCategoryCard).join('')
+    : `<div class="empty-state">${uiState.buscaCompartilhada ? 'Nenhum Resultado Encontrado.' : 'Nenhuma Categoria Ainda.'}</div>`;
+
+  animateRoutineProgress();
+}
+
+function syncMetasUI() {
+  const searchInput = document.getElementById('meta-search');
+  const categoryForm = document.getElementById('category-form-card');
+  const metaForm = document.getElementById('meta-form-card');
+  const categoryButton = document.getElementById('cat-submit-button');
+  const metaButton = document.getElementById('meta-submit-button');
+
+  if (searchInput) searchInput.value = uiState.buscaCompartilhada;
+  if (categoryForm) categoryForm.style.display = uiState.categoriaFormularioAberto ? '' : 'none';
+  if (metaForm) metaForm.style.display = uiState.metaFormularioAberto ? '' : 'none';
+  if (categoryButton) categoryButton.textContent = uiState.editandoCategoriaId ? 'Salvar Categoria' : 'Criar Categoria';
+  if (metaButton) metaButton.textContent = uiState.editandoMetaId ? 'Salvar Alteracoes' : 'Salvar Meta';
+}
+
+function toggleCategoryForm() {
+  uiState.categoriaFormularioAberto = !uiState.categoriaFormularioAberto;
+  if (!uiState.categoriaFormularioAberto) resetCategoryForm();
+  syncMetasUI();
+}
+
+function closeCategoryForm() {
+  resetCategoryForm();
+  uiState.categoriaFormularioAberto = false;
+  syncMetasUI();
+}
+
+function toggleMetaForm() {
+  uiState.metaFormularioAberto = !uiState.metaFormularioAberto;
+  if (!uiState.metaFormularioAberto) resetMetaForm();
+  syncMetasUI();
+}
+
+function closeMetaForm() {
+  resetMetaForm();
+  uiState.metaFormularioAberto = false;
+  syncMetasUI();
+}
+
+function resetCategoryForm() {
+  uiState.editandoCategoriaId = null;
+  const nameInput = document.getElementById('cat-nome');
+  const colorInput = document.getElementById('cat-cor');
+  const commentInput = document.getElementById('cat-comentario');
+  if (nameInput) nameInput.value = '';
+  if (colorInput) colorInput.value = 'blue';
+  if (commentInput) commentInput.value = '';
+}
+
+function resetMetaForm() {
+  uiState.editandoMetaId = null;
+  const titleInput = document.getElementById('m-titulo');
+  const targetInput = document.getElementById('m-alvo');
+  const unitInput = document.getElementById('m-unidade');
+  const deadlineInput = document.getElementById('m-prazo');
+  if (titleInput) titleInput.value = '';
+  if (targetInput) targetInput.value = '';
+  if (unitInput) unitInput.value = 'horas';
+  if (deadlineInput) deadlineInput.value = 'mensal';
+}
+
+function startEditCategory(categoryId) {
+  const categoria = store.categorias.find(item => item.id === categoryId);
+  if (!categoria) return;
+  uiState.editandoCategoriaId = categoryId;
+  uiState.categoriaFormularioAberto = true;
+  renderMetas();
+  document.getElementById('cat-nome').value = categoria.nome || '';
+  document.getElementById('cat-cor').value = categoria.cor || 'blue';
+  document.getElementById('cat-comentario').value = categoria.comentario || '';
+  syncMetasUI();
+}
+
+function startEditMeta(metaId) {
+  const meta = store.metas.find(item => item.id === metaId);
+  if (!meta) return;
+  uiState.editandoMetaId = metaId;
+  uiState.metaFormularioAberto = true;
+  renderMetas();
+  document.getElementById('m-cat').value = meta.catId || '';
+  document.getElementById('m-titulo').value = meta.titulo || '';
+  document.getElementById('m-alvo').value = meta.alvo || '';
+  document.getElementById('m-unidade').value = meta.unidade === 'paginas' ? 'vezes' : (meta.unidade || 'horas');
+  document.getElementById('m-prazo').value = meta.prazo || 'mensal';
+  syncMetasUI();
+}
+
+function toggleCategoryCollapse(categoryId) {
+  uiState.categoriasMinimizadas[categoryId] = !uiState.categoriasMinimizadas[categoryId];
+  renderMetas();
+}
+
+function toggleCompletedTasks(metaId) {
+  uiState.tarefasConcluidasExpandidas[metaId] = !uiState.tarefasConcluidasExpandidas[metaId];
+  renderMetas();
+}
+
+function getVisibleCategoriesForMetas() {
+  if (!uiState.buscaCompartilhada) return store.categorias;
+  return store.categorias.filter(categoria => {
+    const metas = store.metas.filter(meta => meta.catId === categoria.id);
+    return matchesMetaSearch(categoria, null) || metas.some(meta => matchesMetaSearch(categoria, meta));
+  });
+}
+
+function getVisibleMetasForCategory(categoria) {
+  const metas = store.metas.filter(item => item.catId === categoria.id);
+  if (!uiState.buscaCompartilhada || matchesMetaSearch(categoria, null)) return metas;
+  return metas.filter(meta => matchesMetaSearch(categoria, meta));
+}
+
+function matchesMetaSearch(categoria, meta) {
+  if (!uiState.buscaCompartilhada) return true;
+
+  const linkedTasks = meta
+    ? store.tarefas.filter(item => item.metaId === meta.id).map(item => item.nome)
+    : [];
+  const haystack = [
+    categoria?.nome || '',
+    categoria?.comentario || '',
+    meta?.titulo || '',
+    meta?.unidade || '',
+    meta?.prazo || '',
+    ...linkedTasks,
+  ].join(' ').toLowerCase();
+
+  return haystack.includes(uiState.buscaCompartilhada);
 }
 
 function buildCategoryCard(categoria) {
-  const metas = store.metas.filter(item => item.catId === categoria.id);
+  const metas = getVisibleMetasForCategory(categoria);
+  const isCollapsed = Boolean(uiState.categoriasMinimizadas[categoria.id]);
+  const commentHtml = categoria.comentario
+    ? `<div class="cat-comment">${escapeHtml(categoria.comentario)}</div>`
+    : '';
 
   return `
     <div class="cat-card">
       <div class="cat-header">
         <div class="cat-left">
           <div class="cat-dot cat-dot-${categoria.cor}"></div>
-          <span class="cat-nome">${escapeHtml(categoria.nome)}</span>
+          <button type="button" class="cat-toggle" onclick="toggleCategoryCollapse('${categoria.id}')" title="${isCollapsed ? 'Expandir' : 'Minimizar'}">
+            <span class="section-arrow">${isCollapsed ? '&#9656;' : '&#9662;'}</span>
+            <span class="cat-nome">${escapeHtml(categoria.nome)}</span>
+          </button>
           <span class="tiny-muted">${metas.length} ${metas.length === 1 ? 'Meta' : 'Metas'}</span>
         </div>
-        <button type="button" class="del-btn" onclick="delCategoria('${categoria.id}')">×</button>
+        <div class="cat-actions">
+          <button type="button" class="icon-btn" onclick="startEditCategory('${categoria.id}')" title="Editar Categoria">✎</button>
+          <button type="button" class="del-btn" onclick="delCategoria('${categoria.id}')">×</button>
+        </div>
       </div>
-      <div class="cat-body">
+      ${commentHtml}
+      <div class="cat-body${isCollapsed ? ' collapsed' : ''}">
         ${metas.length ? metas.map(buildMetaItem).join('') : '<div class="empty-state">Nenhuma Meta.</div>'}
       </div>
     </div>
@@ -1498,14 +1778,14 @@ function buildCategoryCard(categoria) {
 }
 
 function buildMetaItem(meta) {
-  const progress = getMetaProgress(meta.id, meta.prazo);
+  const progress = getMetaProgress(meta.id, meta.prazo, uiState.dataSelecionada);
   const percent = Math.min(100, Math.round((progress / meta.alvo) * 100));
+  const progressKey = `meta:${meta.id}`;
+  const initialPercent = uiState.progressoAnterior[progressKey] ?? 0;
   const complete = percent >= 100;
+  const isHistoryOpen = Boolean(uiState.tarefasConcluidasExpandidas[meta.id]);
   const linkedTasks = store.tarefas.filter(item => item.metaId === meta.id);
-
-  const linkedHtml = linkedTasks.length
-    ? `<div class="linked-tasks">Tarefas: ${linkedTasks.map(item => escapeHtml(item.nome)).join(' · ')}</div>`
-    : '';
+  const linkedHtml = buildCompletedTasksSummary(meta.id, linkedTasks, isHistoryOpen);
 
   return `
     <div class="meta-item">
@@ -1514,23 +1794,61 @@ function buildMetaItem(meta) {
         <div class="meta-stats">
           <span class="badge badge-${meta.prazo}">${meta.prazo}</span>
           <span class="small-muted">${progress.toFixed(1)} / ${meta.alvo} ${meta.unidade}</span>
-          <button type="button" class="btn-sm" onclick="toggleLogForm('${meta.id}')">+ Log</button>
+          <button type="button" class="icon-btn" onclick="startEditMeta('${meta.id}')" title="Editar Meta">✎</button>
           <button type="button" class="del-btn" onclick="delMeta('${meta.id}')">×</button>
         </div>
       </div>
-      <div class="prog-wrap">
-        <div class="prog-bar"><div class="prog-fill${complete ? ' complete' : ''}" style="width:${percent}%"></div></div>
-        <span class="prog-pct">${percent}%</span>
-      </div>
-      ${linkedHtml}
-      <div class="log-form" id="log-${meta.id}">
-        <div class="form-row no-margin">
-          <input type="number" id="logv-${meta.id}" placeholder="${meta.unidade}" step="0.5" min="0" class="log-input">
-          <input type="date" id="logd-${meta.id}" value="${getToday()}" class="log-date">
-          <button type="button" class="btn btn-primary btn-inline" onclick="addLog('${meta.id}')">Registrar</button>
-          <button type="button" class="btn btn-inline" onclick="toggleLogForm('${meta.id}')">Fechar</button>
+      <div class="meta-collapsible">
+        <div class="prog-wrap">
+          <div class="prog-bar"><div class="prog-fill progress-fill-animated${complete ? ' complete' : ''}" data-progress-key="${progressKey}" data-percent="${percent}" data-start-percent="${initialPercent}" style="width:${initialPercent}%"></div></div>
+          <span class="prog-pct progress-percent" data-progress-key="${progressKey}" data-percent="${percent}" data-start-percent="${initialPercent}">${initialPercent}%</span>
+        </div>
+        ${linkedHtml}
+        <div class="log-form" id="log-${meta.id}">
+          <div class="form-row no-margin">
+            <input type="number" id="logv-${meta.id}" placeholder="${meta.unidade}" step="0.5" min="0" class="log-input">
+            <input type="date" id="logd-${meta.id}" value="${uiState.dataSelecionada}" class="log-date">
+            <button type="button" class="btn btn-primary btn-inline" onclick="addLog('${meta.id}')">Registrar</button>
+            <button type="button" class="btn btn-inline" onclick="toggleLogForm('${meta.id}')">Fechar</button>
+          </div>
         </div>
       </div>
+    </div>
+  `;
+}
+
+function buildCompletedTasksSummary(metaId, linkedTasks, isOpen) {
+  if (!linkedTasks.length) return '';
+
+  const completed = linkedTasks.flatMap(tarefa => store.registros
+    .filter(registro => registro.tarefaId === tarefa.id && registro.status === 'feito')
+    .map(registro => ({ tarefa, registro })))
+    .sort((a, b) => `${b.registro.completedDate || b.registro.data} ${b.registro.completedAt || ''}`.localeCompare(`${a.registro.completedDate || a.registro.data} ${a.registro.completedAt || ''}`));
+
+  const listHtml = completed.length
+    ? `<div class="completed-task-list">
+        ${completed.map(({ tarefa, registro }) => `
+          <div class="completed-task-row">
+            <div>
+              <div class="completed-task-name">${escapeHtml(tarefa.nome)}</div>
+              ${tarefa.comentario ? `<div class="completed-task-comment">${escapeHtml(tarefa.comentario)}</div>` : ''}
+            </div>
+            <div class="completed-task-date">
+              ${formatDateShort(registro.completedDate || registro.data)}
+              ${registro.completedAt ? `<span>${escapeHtml(registro.completedAt)}</span>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>`
+    : '<div class="empty-state">Nenhuma tarefa concluida vinculada a esta meta.</div>';
+
+  return `
+    <div class="linked-tasks">
+      <button type="button" class="linked-tasks-toggle" onclick="toggleCompletedTasks('${metaId}')">
+        <span class="section-arrow">${isOpen ? '&#9662;' : '&#9656;'}</span>
+        <span>Tarefas concluidas (${completed.length})</span>
+      </button>
+      ${isOpen ? listHtml : ''}
     </div>
   `;
 }
@@ -1579,9 +1897,16 @@ function addMeta() {
     if (!titulo) throw new Error('Informe o título da meta.');
     if (!alvo) throw new Error('Informe um valor de meta válido.');
 
-    dataService.addMeta({ catId, titulo, alvo, unidade, prazo });
+    if (uiState.editandoMetaId) {
+      dataService.updateMeta(uiState.editandoMetaId, { catId, titulo, alvo, unidade, prazo });
+    } else {
+      dataService.addMeta({ catId, titulo, alvo, unidade, prazo });
+    }
+
     document.getElementById('m-titulo').value = '';
     document.getElementById('m-alvo').value = '';
+    uiState.editandoMetaId = null;
+    uiState.metaFormularioAberto = false;
     renderMetas();
     showFeedback('success', 'Meta salva com sucesso.');
   });
@@ -1602,12 +1927,22 @@ function addCategoria() {
     const nome = document.getElementById('cat-nome').value.trim();
     if (!nome) throw new Error('Informe o nome da categoria.');
 
-    dataService.addCategory({
+    const payload = {
       nome,
       cor: document.getElementById('cat-cor').value,
-    });
+      comentario: document.getElementById('cat-comentario').value.trim(),
+    };
+
+    if (uiState.editandoCategoriaId) {
+      dataService.updateCategory(uiState.editandoCategoriaId, payload);
+    } else {
+      dataService.addCategory(payload);
+    }
 
     document.getElementById('cat-nome').value = '';
+    document.getElementById('cat-comentario').value = '';
+    uiState.editandoCategoriaId = null;
+    uiState.categoriaFormularioAberto = false;
     renderMetas();
     renderRotina();
     showFeedback('success', 'Categoria salva com sucesso.');
@@ -1777,3 +2112,4 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', flushPersist);
 
 bootstrap();
+

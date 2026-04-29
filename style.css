@@ -327,7 +327,6 @@ body {
   border-color: var(--purple-bd);
   background: var(--purple-bg);
   color: var(--purple);
-  transform: translateY(-1px);
   box-shadow: var(--glow-purple);
 }
 
@@ -381,6 +380,16 @@ body {
   padding: 14px;
 }
 
+.meta-form-card {
+  margin-top: 12px;
+}
+
+.form-help {
+  margin-top: 2px;
+  color: var(--tx3);
+  font-size: 12px;
+}
+
 .tab {
   position: relative;
   margin-bottom: -1px;
@@ -406,7 +415,6 @@ body {
 .tab:hover:not(.active) {
   background: var(--bg2);
   color: var(--tx1);
-  transform: translateY(-1px);
 }
 
 .date-row,
@@ -457,7 +465,6 @@ body {
   border-color: var(--purple-bd);
   background: var(--bg3);
   color: var(--purple);
-  transform: translateY(-1px);
   box-shadow: var(--glow-purple);
 }
 
@@ -564,7 +571,6 @@ body {
 .cal-day:hover {
   background: var(--bg3);
   color: var(--tx1);
-  transform: translateY(-1px);
 }
 
 .cal-day.today {
@@ -733,6 +739,11 @@ body {
   border-radius: var(--r-md);
   animation: taskReveal 0.28s ease both;
   transition: opacity 0.18s ease, transform 0.18s ease;
+  cursor: default;
+}
+
+.task-item * {
+  cursor: inherit;
 }
 
 .task-item::before {
@@ -854,6 +865,14 @@ body {
   min-width: 0;
 }
 
+.task-actions,
+.cat-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .task-time {
   margin-right: 6px;
   color: var(--tx2);
@@ -937,10 +956,6 @@ body {
   color: var(--purple);
 }
 
-.comment-arrow {
-  transform: translateY(-1px);
-}
-
 .task-comment {
   flex: 1;
   color: var(--tx1);
@@ -996,6 +1011,12 @@ body {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.duration-chip {
+  color: var(--tx2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .dur-inline {
@@ -1072,6 +1093,7 @@ body {
 }
 
 .badge-mensal,
+.badge-anual,
 .badge-purple {
   border: 1px solid var(--purple-bd);
   background: var(--purple-bg);
@@ -1139,7 +1161,6 @@ body {
 
 .metric:hover {
   border-color: var(--bd2);
-  transform: translateY(-2px);
   box-shadow: var(--shadow-lift);
 }
 
@@ -1235,6 +1256,13 @@ body {
   padding: 0 16px;
 }
 
+.cat-comment {
+  padding: 10px 16px 0;
+  color: var(--tx2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 .meta-item {
   padding: 11px 0;
   animation: taskReveal 0.3s ease both;
@@ -1252,6 +1280,28 @@ body {
 .meta-titulo {
   font-size: 13.5px;
   font-weight: 500;
+}
+
+.cat-toggle,
+.linked-tasks-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--tx1);
+  cursor: pointer;
+  font-family: var(--font);
+}
+
+.cat-toggle:hover,
+.linked-tasks-toggle:hover {
+  color: var(--purple);
+}
+
+.cat-body.collapsed {
+  display: none;
 }
 
 .meta-stats {
@@ -1282,13 +1332,50 @@ body {
   font-size: 11px;
 }
 
+.completed-task-list {
+  margin-top: 8px;
+  border-top: 1px solid var(--bd1);
+}
+
+.completed-task-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bd1);
+}
+
+.completed-task-name {
+  color: var(--tx1);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.completed-task-comment {
+  margin-top: 3px;
+  color: var(--tx3);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.completed-task-date {
+  min-width: 92px;
+  color: var(--tx2);
+  font-size: 11px;
+  text-align: right;
+}
+
+.completed-task-date span {
+  display: block;
+  margin-top: 2px;
+  color: var(--green);
+}
+
 .log-form {
   display: none;
   margin-top: 8px;
   padding: 8px 10px;
-  border: 1px solid var(--bd1);
-  border-radius: var(--r-sm);
-  background: var(--bg2);
 }
 
 .log-form.open {
@@ -1464,7 +1551,6 @@ select:focus,
 textarea:focus {
   border-color: var(--purple);
   box-shadow: var(--glow-purple), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  transform: translateY(-1px);
 }
 
 select option {
@@ -1487,7 +1573,8 @@ input[type='time'] {
 }
 
 .btn,
-.btn-sm {
+.btn-sm,
+.icon-btn {
   border: 1px solid var(--bd2);
   border-radius: var(--r-sm);
   cursor: pointer;
@@ -1507,7 +1594,6 @@ input[type='time'] {
   border-color: var(--purple);
   background: var(--bg4);
   color: var(--purple);
-  transform: translateY(-2px);
   box-shadow: 0 9px 0 rgba(0, 0, 0, 0.12), var(--glow-purple);
 }
 
@@ -1542,7 +1628,26 @@ input[type='time'] {
 .btn-sm:hover {
   border-color: var(--purple);
   color: var(--purple);
-  transform: translateY(-1px);
+  box-shadow: var(--glow-purple);
+}
+
+.icon-btn {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg3);
+  color: var(--tx3);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1;
+  transition: box-shadow 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.icon-btn:hover {
+  border-color: var(--purple);
+  color: var(--purple);
   box-shadow: var(--glow-purple);
 }
 
@@ -1629,6 +1734,10 @@ input[type='time'] {
   .routine-toolbar-actions input {
     width: 100%;
   }
+
+  .meta-toolbar-actions .btn {
+    flex: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1640,4 +1749,8 @@ input[type='time'] {
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+.tab {
+  padding-bottom: 9px; /* era 8px, adiciona 1px extra pra compensar o translateY */
 }
