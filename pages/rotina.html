@@ -1,0 +1,120 @@
+<!-- Barra principal -->
+<div class="routine-toolbar">
+  <div class="date-row">
+    <span id="sel-date-label" class="date-label"></span>
+    <button type="button" class="cal-toggle" id="cal-toggle-btn" onclick="toggleCalendar()">Calendário</button>
+  </div>
+  <div class="routine-toolbar-actions">
+    <input type="text" id="task-search" placeholder="Pesquisar Tarefa Ou Informação" oninput="onTaskSearchInput()">
+    <button type="button" class="btn btn-primary" onclick="toggleTaskForm()">Adicionar Tarefa</button>
+  </div>
+</div>
+
+<div class="routine-filter-row">
+  <div class="quick-filters" id="task-quick-filters">
+    <button type="button" class="filter-chip active" onclick="setTaskFilter('todas', this)">Todas</button>
+    <button type="button" class="filter-chip" onclick="setTaskFilter('pendentes', this)">Pendente</button>
+    <button type="button" class="filter-chip" onclick="setTaskFilter('feitas', this)">Concluídas</button>
+    <button type="button" class="filter-chip" onclick="setTaskFilter('nao_feitas', this)">Não concluídas</button>
+  </div>
+  <div id="routine-day-summary" class="routine-day-summary"></div>
+</div>
+
+<div class="calendar" id="calendar-panel">
+  <div class="cal-header">
+    <button type="button" class="cal-nav" onclick="prevMonth()">&lsaquo;</button>
+    <span id="cal-month-label"></span>
+    <button type="button" class="cal-nav" onclick="nextMonth()">&rsaquo;</button>
+  </div>
+  <div class="cal-weekdays">
+    <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span>
+    <span>Sex</span><span>Sab</span><span>Dom</span>
+  </div>
+  <div id="cal-grid"></div>
+</div>
+
+<!-- Formulário de tarefa -->
+<div class="card task-form-card" id="task-form-card" style="display:none;">
+  <div class="stitle">Adicionar Tarefa</div>
+  <div class="form-row">
+    <select id="t-meta" onchange="onAddMetaChange()" style="width:185px;">
+      <option value="">Sem Meta Vinculada</option>
+    </select>
+    <input type="text" id="t-nome" placeholder="Nome Da Tarefa" class="flex1">
+    <span id="t-nome-label" style="display:none;font-size:13px;color:var(--tx1);padding:7px 10px;background:var(--bg3);border-radius:var(--r-sm);border:1px solid var(--bd1);"></span>
+    <select id="t-rec" style="width:150px;" onchange="onTaskTypeChange()">
+      <option value="diario">Diária</option>
+      <option value="semanal">Semanal Flexível</option>
+      <option value="mensal">Mensal Flexível</option>
+      <option value="unica">Somente Nesta Data</option>
+    </select>
+  </div>
+
+  <div class="form-row" id="weekday-wrap">
+    <div id="weekday-selector" class="weekday-selector"></div>
+  </div>
+
+  <div class="form-row" id="single-date-wrap" style="display:none;">
+    <input type="date" id="t-data-unica" style="width:170px;">
+  </div>
+
+  <div class="form-row" id="monthly-date-wrap" style="display:none;">
+    <input type="date" id="t-data-mensal" style="width:170px;">
+  </div>
+
+  <div class="form-row" id="time-wrap">
+    <input type="time" id="t-inicio" style="width:100px;" title="Início">
+    <input type="time" id="t-fim" style="width:100px;" title="Fim">
+  </div>
+
+  <div class="form-row">
+    <textarea id="t-comentario" placeholder="Comentário Da Tarefa" class="flex1"></textarea>
+  </div>
+
+  <div class="form-row">
+    <button type="button" class="btn btn-primary" id="task-submit-button" onclick="addTarefa()">Salvar Tarefa</button>
+    <button type="button" class="btn" id="task-close-form" onclick="closeTaskForm()">Fechar</button>
+    <button type="button" class="btn" id="task-cancel-edit" onclick="cancelTaskEdit()" style="display:none;">Cancelar Edição</button>
+  </div>
+
+  <div id="task-type-help" style="font-size:12px;color:var(--tx2);margin-bottom:8px;">
+    A tarefa aparece somente nos dias da semana marcados abaixo.
+  </div>
+
+  <div style="font-size:12px;color:var(--tx3);">
+    Em tarefas com horário, o fim precisa acontecer no mesmo dia. Em tarefas semanais e mensais, o horário fica livre para você concluir quando quiser dentro do período.
+  </div>
+</div>
+
+<!-- Listas de tarefas -->
+<div class="section-header">
+  <button type="button" class="section-toggle" onclick="toggleSectionCollapse('unica')" title="Minimizar">
+    <span>Tarefas Desta Data</span>
+    <span class="section-arrow">▾</span>
+  </button>
+</div>
+<div class="card"><div id="unica-list"></div></div>
+
+<div class="section-header">
+  <button type="button" class="section-toggle" onclick="toggleSectionCollapse('diario')" title="Minimizar">
+    <span>Tarefas Diárias</span>
+    <span class="section-arrow">▾</span>
+  </button>
+</div>
+<div class="card"><div id="diario-list"></div></div>
+
+<div class="section-header">
+  <button type="button" class="section-toggle" onclick="toggleSectionCollapse('semanal')" title="Minimizar">
+    <span>Tarefas Semanais</span>
+    <span class="section-arrow">▾</span>
+  </button>
+</div>
+<div class="card"><div id="semanal-list"></div></div>
+
+<div class="section-header">
+  <button type="button" class="section-toggle" onclick="toggleSectionCollapse('mensal')" title="Minimizar">
+    <span>Tarefas Mensais</span>
+    <span class="section-arrow">▾</span>
+  </button>
+</div>
+<div class="card"><div id="mensal-list"></div></div>

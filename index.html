@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planejamento Pessoal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+  <!-- Header with local save status -->
+  <div class="app-header">
+    <div class="app-title">Planejamento Pessoal</div>
+    <div class="header-right">
+      <div class="save-status">
+        <div class="save-dot saved" id="save-dot"></div>
+        <span id="save-label">Salvo Neste Navegador</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Temporary notice while the project still uses browser storage -->
+  <div class="banner info show">
+    <span>Seus Dados Ficam Salvos Neste Navegador Enquanto Finalizamos A Estrutura Para Migrar Depois Para Banco De Dados.</span>
+  </div>
+
+  <div class="banner" id="feedback-banner">
+    <span id="feedback-text"></span>
+  </div>
+
+  <!-- Main navigation -->
+  <div class="tabs">
+    <button type="button" class="tab active" onclick="switchTab('rotina',this)">Rotina</button>
+    <button type="button" class="tab" onclick="switchTab('metas',this)">Metas</button>
+    <button type="button" class="tab" onclick="switchTab('financeiro',this)">Financeiro</button>
+  </div>
+
+  <!-- Current page content is injected by app.js -->
+  <div id="page-content"></div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

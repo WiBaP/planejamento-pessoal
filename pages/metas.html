@@ -1,0 +1,40 @@
+<!-- Resumo e lista de categorias -->
+<div id="metas-overview" class="metrics" style="display:none;"></div>
+<div id="cat-list"></div>
+
+<!-- Formulário de categoria -->
+<div class="stitle">Nova Categoria</div>
+<div class="form-row">
+  <input type="text" id="cat-nome" placeholder="Nome Da Categoria" class="flex1">
+  <select id="cat-cor" style="width:120px;">
+    <option value="blue">Azul</option>
+    <option value="green">Verde</option>
+    <option value="purple">Roxo</option>
+    <option value="yellow">Amarelo</option>
+    <option value="pink">Rosa</option>
+    <option value="cyan">Ciano</option>
+    <option value="orange">Laranja</option>
+    <option value="red">Vermelho</option>
+  </select>
+  <button type="button" class="btn btn-primary" onclick="addCategoria()">Criar</button>
+</div>
+
+<!-- Formulário de meta -->
+<div class="stitle">Nova Meta</div>
+<div class="form-row">
+  <select id="m-cat" style="width:160px;"></select>
+  <input type="text" id="m-titulo" placeholder="Título" class="flex1">
+  <input type="number" id="m-alvo" placeholder="Meta" min="1" step="0.5" style="width:75px;">
+  <select id="m-unidade" style="width:105px;">
+    <option value="horas">Horas</option>
+    <option value="vezes">Vezes</option>
+    <option value="km">Km</option>
+    <option value="paginas">Paginas</option>
+    <option value="min">Minutos</option>
+  </select>
+  <select id="m-prazo" style="width:105px;">
+    <option value="mensal">Mensal</option>
+    <option value="semanal">Semanal</option>
+  </select>
+  <button type="button" class="btn btn-primary" onclick="addMeta()">Adicionar</button>
+</div>
