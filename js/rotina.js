@@ -2,7 +2,7 @@ function validateTaskCanBeMarked(tarefa, dateKey) {
   if (tarefa.recorrencia === 'semanal' && tarefa.diasSemana.length) {
     const allowed = tarefa.diasSemana.includes(getIsoWeekday(dateKey));
     if (!allowed) {
-      throw new Error(`Essa tarefa sÃ³ pode ser marcada nos dias: ${tarefa.diasSemana.map(dia => WEEKDAY_OPTIONS.find(item => item.value === dia).label).join(', ')}.`);
+      throw new Error(`Essa tarefa só pode ser marcada nos dias: ${tarefa.diasSemana.map(dia => WEEKDAY_OPTIONS.find(item => item.value === dia).label).join(', ')}.`);
     }
   }
 
@@ -10,16 +10,16 @@ function validateTaskCanBeMarked(tarefa, dateKey) {
     const expectedDay = Number(tarefa.dataMensal.slice(-2));
     const currentDay = Number(dateKey.slice(-2));
     if (expectedDay !== currentDay) {
-      throw new Error(`Essa tarefa sÃ³ pode ser marcada no dia ${String(expectedDay).padStart(2, '0')} de cada mÃªs.`);
+      throw new Error(`Essa tarefa só pode ser marcada no dia ${String(expectedDay).padStart(2, '0')} de cada mês.`);
     }
   }
   if (tarefa.recorrencia === 'anual') {
     if (tarefa.dataAnual && tarefa.dataAnual.slice(5) !== dateKey.slice(5)) {
-      throw new Error(`Essa tarefa sÃƒÂ³ pode ser marcada em ${formatDateShort(tarefa.dataAnual).slice(0, 5)} de cada ano.`);
+      throw new Error(`Essa tarefa só pode ser marcada em ${formatDateShort(tarefa.dataAnual).slice(0, 5)} de cada ano.`);
     }
 
     if (tarefa.mesAnual && tarefa.mesAnual.slice(5, 7) !== dateKey.slice(5, 7)) {
-      throw new Error(`Essa tarefa sÃƒÂ³ pode ser marcada em ${formatMonthLabel(tarefa.mesAnual)}.`);
+      throw new Error(`Essa tarefa só pode ser marcada em ${formatMonthLabel(tarefa.mesAnual)}.`);
     }
   }
 }
@@ -93,16 +93,16 @@ function playTaskStatusSweep(taskId, status, onComplete) {
   });
 }
 
-/* AÃ§Ãµes globais da rotina. */
+/* Ações globais da rotina. */
 function setStatus(taskId, status) {
   runSafely('setStatus', () => {
     const tarefa = store.tarefas.find(item => item.id === taskId);
-    if (!tarefa) throw new Error('Tarefa nÃ£o encontrada.');
+    if (!tarefa) throw new Error('Tarefa não encontrada.');
 
     validateTaskCanBeMarked(tarefa, uiState.dataSelecionada);
 
     const currentRecord = getTaskRecord(tarefa.id, getTaskProgressKey(tarefa, uiState.dataSelecionada));
-    const shouldAnimateStatus = currentRecord.status !== status;
+    const shouldAnimateStatus = currentRecord?.status !== status;
 
     if (shouldAnimateStatus) {
       playTaskStatusSweep(taskId, status, () => {
@@ -126,29 +126,40 @@ function toggleDur(taskId) {
 function saveDur(taskId) {
   runSafely('saveDur', () => {
     const tarefa = store.tarefas.find(item => item.id === taskId);
-    if (!tarefa) throw new Error('Tarefa nÃ£o encontrada.');
+    if (!tarefa) throw new Error('Tarefa não encontrada.');
     validateTaskCanBeMarked(tarefa, uiState.dataSelecionada);
 
     const input = document.getElementById(`durv-${taskId}`);
-    const minutes = durationInputToMinutes(input.value);
-    if (!minutes) throw new Error('Informe a duraÃ§Ã£o em horas e minutos.');
-    if (minutes > 1439) throw new Error('A duraÃ§Ã£o mÃ¡xima permitida Ã© de 23h59.');
+    const meta = tarefa.metaId ? store.metas.find(item => item.id === tarefa.metaId) : null;
+    const metaUnit = meta?.unidade || 'horas';
 
-    dataService.saveTaskDuration(taskId, uiState.dataSelecionada, minutes);
+    if (metaUnit === 'horas') {
+      const minutes = durationInputToMinutes(input.value);
+      if (!minutes) throw new Error('Informe a duração em horas e minutos.');
+      if (minutes > 1439) throw new Error('A duração máxima permitida é de 23h59.');
+      dataService.saveTaskDuration(taskId, uiState.dataSelecionada, minutes);
+    } else {
+      const valor = parseFloat(input.value);
+      if (!valor || valor <= 0) {
+        const unidadeNome = metaUnit === 'km' ? 'km' : 'vezes';
+        throw new Error(`Informe um valor em ${unidadeNome}.`);
+      }
+      dataService.saveTaskValue(taskId, uiState.dataSelecionada, valor);
+    }
     document.getElementById(`dur-${taskId}`).classList.remove('open');
     renderCurrentPage();
   });
 }
 
 function delTarefa(taskId) {
-  if (!confirm('Confirma a exclusÃ£o desta tarefa')) return;
+  if (!confirm('Confirma a exclusão desta tarefa')) return;
   runSafely('delTarefa', () => {
     dataService.deleteTask(taskId);
     renderRotina();
   });
 }
 
-/* Controles do calendÃ¡rio. */
+/* Controles do calendário. */
 function prevMonth() {
   uiState.mesCalendario = new Date(uiState.mesCalendario.getFullYear(), uiState.mesCalendario.getMonth() - 1, 1);
   renderCalendar();
@@ -238,8 +249,9 @@ function renderCalendar() {
   grid.innerHTML = cells.join('');
 }
 
-/* RenderizaÃ§Ã£o da rotina e do formulÃ¡rio de tarefa. */
+/* Renderização da rotina e do formulário de tarefa. */
 function renderRotina() {
+  if (!document.getElementById('t-meta')) return;
   renderTaskMetaOptions();
   renderWeekdaySelector();
   onTaskTypeChange();
@@ -259,7 +271,7 @@ function syncRoutineUI() {
   const cancelButton = document.getElementById('task-cancel-edit');
 
   if (searchInput) searchInput.value = uiState.buscaCompartilhada;
-  if (formCard) formCard.style.display = uiState.rotinaFormularioAberto ? '' : 'none';
+  if (formCard) setFormOpen(formCard, uiState.rotinaFormularioAberto);
   if (submitButton) submitButton.textContent = uiState.editandoTarefaId ? 'Salvar Alterações' : 'Salvar Tarefa';
   if (closeButton) closeButton.style.display = uiState.editandoTarefaId ? 'none' : '';
   if (cancelButton) cancelButton.style.display = uiState.editandoTarefaId ? '' : 'none';
@@ -276,7 +288,7 @@ function syncRoutineUI() {
     }
     if (button) {
       const arrow = button.querySelector('.section-arrow');
-      if (arrow) arrow.textContent = uiState.secoesMinimizadas[section] ? '?' : '?';
+      if (arrow) arrow.innerHTML = uiState.secoesMinimizadas[section] ? '&#9656;' : '&#9662;';
       button.title = uiState.secoesMinimizadas[section] ? 'Expandir' : 'Minimizar';
     }
   });
@@ -284,6 +296,10 @@ function syncRoutineUI() {
 
 function toggleTaskForm() {
   uiState.rotinaFormularioAberto = !uiState.rotinaFormularioAberto;
+  if (uiState.rotinaFormularioAberto) {
+    uiState.categoriaFormularioAberto = false;
+    uiState.metaFormularioAberto = false;
+  }
   if (!uiState.rotinaFormularioAberto) resetTaskForm();
   syncRoutineUI();
 }
@@ -465,10 +481,10 @@ function onTaskTypeChange() {
   if (recurrence === 'anual' && !annualMonthInput.value) annualMonthInput.value = uiState.dataSelecionada.slice(0, 7);
 
   if (recurrence === 'diario') helper.textContent = 'A tarefa aparece somente nos dias da semana marcados abaixo.';
-  if (recurrence === 'semanal') helper.textContent = 'Tarefa semanal: marque os dias de referÃªncia se quiser. Ela continua valendo para a semana inteira e reinicia toda segunda-feira.';
-  if (recurrence === 'mensal') helper.textContent = 'Tarefa mensal: a data de referÃªncia Ã© opcional. Se escolher uma data, esse dia fica destacado no mÃªs.';
+  if (recurrence === 'semanal') helper.textContent = 'Tarefa semanal: marque os dias de referência se quiser. Ela continua valendo para a semana inteira e reinicia toda segunda-feira.';
+  if (recurrence === 'mensal') helper.textContent = 'Tarefa mensal: a data de referência é opcional. Se escolher uma data, esse dia fica destacado no mês.';
   if (recurrence === 'anual') helper.textContent = 'Tarefa anual: pode valer para o ano inteiro, para um mes especifico ou para um dia fixo do ano.';
-  if (recurrence === 'unica') helper.textContent = 'Tarefa de uma data especÃ­fica. Ela aparece somente no dia escolhido.';
+  if (recurrence === 'unica') helper.textContent = 'Tarefa de uma data específica. Ela aparece somente no dia escolhido.';
 }
 
 function getSelectedWeekdays() {
@@ -480,7 +496,7 @@ function getSelectedWeekdays() {
 function buildSectionProgress(sectionKey, tarefas, emptyWhenZero = false) {
   if (!tarefas.length && emptyWhenZero) return '';
 
-  const feitas = tarefas.filter(item => getTaskRecord(item.id, getTaskProgressKey(item, uiState.dataSelecionada)).status === 'feito').length;
+  const feitas = tarefas.filter(item => getTaskRecord(item.id, getTaskProgressKey(item, uiState.dataSelecionada))?.status === 'feito').length;
   const percent = tarefas.length ? Math.round((feitas / tarefas.length) * 100) : 0;
   const progressKey = `section:${sectionKey}`;
   const initialPercent = uiState.progressoAnterior[progressKey] ?? percent;
@@ -533,8 +549,8 @@ function animateRoutineProgress() {
 
 function getTaskStatusForDate(tarefa, dateKey) {
   const record = getTaskRecord(tarefa.id, getTaskProgressKey(tarefa, dateKey));
-  if (record.status === 'feito') return 'feita';
-  if (record.status === 'nao_feito') return 'nao_feita';
+  if (record?.status === 'feito') return 'feita';
+  if (record?.status === 'nao_feito') return 'nao_feita';
   return 'pendente';
 }
 
@@ -614,7 +630,7 @@ function renderTaskLists() {
   diarioList.innerHTML = buildSectionProgress('diario', diarias, true) + (
     diarias.length
       ? diarias.map(item => buildTaskItem(item, uiState.dataSelecionada)).join('')
-      : '<div class="empty-state">Nenhuma Tarefa DiÃ¡ria Neste Dia.</div>'
+      : '<div class="empty-state">Nenhuma Tarefa Diária Neste Dia.</div>'
   );
 
   semanalList.innerHTML = buildSectionProgress('semanal', semanais, true) + (
@@ -686,26 +702,51 @@ function buildTaskItem(tarefa, viewDate) {
           </div>
         `;
       })()
-    : '<div class="task-meta-row"><span class="badge badge-habit">H?bito</span></div>';
+    : '<div class="task-meta-row"><span class="badge badge-habit">Hábito</span></div>';
 
   const isCommentCollapsed = Boolean(uiState.comentariosMinimizados[tarefa.id]);
   const commentBlock = tarefa.comentario
     ? `
       <div class="task-comment-wrap">
-        <button type="button" class="comment-toggle" onclick="toggleTaskComment('${tarefa.id}')" title="${isCommentCollapsed ? 'Mostrar Coment?rio' : 'Ocultar Coment?rio'}">
+        <button type="button" class="comment-toggle" onclick="toggleTaskComment('${tarefa.id}')" title="${isCommentCollapsed ? 'Mostrar Comentário' : 'Ocultar Comentário'}">
           <span class="comment-arrow">${isCommentCollapsed ? '&#9656;' : '&#9662;'}</span>
         </button>
-        ${isCommentCollapsed ? '<span class="task-comment-collapsed">Coment?rio oculto</span>' : `<div class="task-comment">${escapeHtml(tarefa.comentario)}</div>`}
+        ${isCommentCollapsed ? '<span class="task-comment-collapsed">Comentário oculto</span>' : `<div class="task-comment">${escapeHtml(tarefa.comentario)}</div>`}
       </div>
     `
     : '';
 
+  const metaUnit = meta?.unidade || 'horas';
+  const isTimeUnit = metaUnit === 'horas';
+  let editorInput;
+  let editorChip = '';
+  let editorTitle;
+
+  if (isTimeUnit) {
+    editorTitle = 'Registrar Tempo';
+    if (registro?.duracaoMinutos) {
+      editorChip = `<span class="duration-chip">${formatMinutes(registro.duracaoMinutos)}</span>`;
+    }
+    const timeValue = registro?.duracaoMinutos
+      ? String(Math.floor(registro.duracaoMinutos / 60)).padStart(2, '0') + ':' + String(registro.duracaoMinutos % 60).padStart(2, '0')
+      : '';
+    editorInput = `<input type="time" id="durv-${tarefa.id}" value="${timeValue}" class="dur-input-time">`;
+  } else {
+    const unitLabel = metaUnit === 'km' ? 'Km' : 'Vezes';
+    const step = metaUnit === 'km' ? '0.1' : '1';
+    editorTitle = `Registrar ${unitLabel}`;
+    if (registro?.valor) {
+      editorChip = `<span class="duration-chip">${registro.valor} ${metaUnit}</span>`;
+    }
+    editorInput = `<input type="number" id="durv-${tarefa.id}" value="${registro?.valor ?? ''}" step="${step}" min="0" placeholder="${unitLabel}" class="dur-input-time">`;
+  }
+
   const durationEditor = `
     <div class="dur-area">
-      <button type="button" class="icon-btn" onclick="toggleDur('${tarefa.id}')" title="Registrar Tempo">?</button>
-      ${registro?.duracaoMinutos ? `<span class="duration-chip">${formatMinutes(registro.duracaoMinutos)}</span>` : ''}
+      <button type="button" class="icon-btn" onclick="toggleDur('${tarefa.id}')" title="${editorTitle}">&#9719;</button>
+      ${editorChip}
       <div id="dur-${tarefa.id}" class="dur-inline">
-        <input type="time" id="durv-${tarefa.id}" value="${registro?.duracaoMinutos ? String(Math.floor(registro.duracaoMinutos / 60)).padStart(2, '0') + ':' + String(registro.duracaoMinutos % 60).padStart(2, '0') : ''}" class="dur-input-time">
+        ${editorInput}
         <button type="button" class="btn-sm" onclick="saveDur('${tarefa.id}')">Ok</button>
       </div>
     </div>
@@ -714,7 +755,7 @@ function buildTaskItem(tarefa, viewDate) {
   return `
     <div class="task-item${isDone ? ' task-done' : ''}${isMissed ? ' task-not' : ''}" data-task-id="${tarefa.id}">
       <div class="task-status">
-        <button type="button" class="status-btn check${isDone ? ' active' : ''}" onclick="setStatus('${tarefa.id}', 'feito')" title="Marcar Como Feito">?</button>
+        <button type="button" class="status-btn check${isDone ? ' active' : ''}" onclick="setStatus('${tarefa.id}', 'feito')" title="Marcar Como Feito">&#10003;</button>
         <button type="button" class="status-btn cross${isMissed ? ' active' : ''}" onclick="setStatus('${tarefa.id}', 'nao_feito')" title="Marcar Como Não Feito">✕</button>
       </div>
       <div class="task-body">
@@ -732,9 +773,9 @@ function buildTaskItem(tarefa, viewDate) {
         ${commentBlock}
       </div>
       <div class="task-actions">
-        <button type="button" class="icon-btn" onclick="startEditTask('${tarefa.id}')" title="Editar Tarefa">?</button>
+        <button type="button" class="icon-btn" onclick="startEditTask('${tarefa.id}')" title="Editar Tarefa">✎</button>
         ${durationEditor}
-        <button type="button" class="del-btn" onclick="delTarefa('${tarefa.id}')">?</button>
+        <button type="button" class="del-btn" onclick="delTarefa('${tarefa.id}')">×</button>
       </div>
     </div>
   `;
@@ -773,7 +814,7 @@ function addTarefa() {
     const fim = document.getElementById('t-fim').value || null;
 
     if (recurrence === 'diario' || recurrence === 'unica') {
-      validateTimeRange(inicio, fim, 'Uma tarefa com hor?rio');
+      validateTimeRange(inicio, fim, 'Uma tarefa com horário');
     }
 
     const selectedWeekdays = getSelectedWeekdays();
@@ -811,11 +852,11 @@ function addTarefa() {
     }
 
     if (recurrence === 'anual' && annualMode === 'mes' && !payload.mesAnual) {
-      throw new Error('Escolha o m?s anual da tarefa.');
+      throw new Error('Escolha o mês anual da tarefa.');
     }
 
     if (recurrence === 'diario' && !payload.diasSemana.length) {
-      throw new Error('Selecione pelo menos um dia da semana para a tarefa di?ria.');
+      throw new Error('Selecione pelo menos um dia da semana para a tarefa diária.');
     }
 
     if (uiState.editandoTarefaId) {
@@ -845,7 +886,7 @@ function addTarefa() {
     renderRotina();
     const apareceHoje = recurrence === 'diario' ? taskOccursOnDate(normalizeTask(payload), uiState.dataSelecionada) : true;
     const message = recurrence === 'diario' && !apareceHoje
-      ? `Tarefa salva com sucesso. Ela aparecer? em: ${selectedWeekdays.map(dia => WEEKDAY_OPTIONS.find(item => item.value === dia)?.label).join(', ')}.`
+      ? `Tarefa salva com sucesso. Ela aparecerá em: ${selectedWeekdays.map(dia => WEEKDAY_OPTIONS.find(item => item.value === dia)?.label).join(', ')}.`
       : 'Tarefa salva com sucesso.';
     showFeedback('success', message);
   });

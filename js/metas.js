@@ -42,14 +42,18 @@ function syncMetasUI() {
   const metaButton = document.getElementById('meta-submit-button');
 
   if (searchInput) searchInput.value = uiState.buscaCompartilhada;
-  if (categoryForm) categoryForm.style.display = uiState.categoriaFormularioAberto ? '' : 'none';
-  if (metaForm) metaForm.style.display = uiState.metaFormularioAberto ? '' : 'none';
+  if (categoryForm) setFormOpen(categoryForm, uiState.categoriaFormularioAberto);
+  if (metaForm) setFormOpen(metaForm, uiState.metaFormularioAberto);
   if (categoryButton) categoryButton.textContent = uiState.editandoCategoriaId ? 'Salvar Categoria' : 'Criar Categoria';
   if (metaButton) metaButton.textContent = uiState.editandoMetaId ? 'Salvar Alterações' : 'Salvar Meta';
 }
 
 function toggleCategoryForm() {
   uiState.categoriaFormularioAberto = !uiState.categoriaFormularioAberto;
+  if (uiState.categoriaFormularioAberto) {
+    uiState.metaFormularioAberto = false;
+    uiState.rotinaFormularioAberto = false;
+  }
   if (!uiState.categoriaFormularioAberto) resetCategoryForm();
   syncMetasUI();
 }
@@ -62,6 +66,10 @@ function closeCategoryForm() {
 
 function toggleMetaForm() {
   uiState.metaFormularioAberto = !uiState.metaFormularioAberto;
+  if (uiState.metaFormularioAberto) {
+    uiState.categoriaFormularioAberto = false;
+    uiState.rotinaFormularioAberto = false;
+  }
   if (!uiState.metaFormularioAberto) resetMetaForm();
   syncMetasUI();
 }
@@ -115,7 +123,8 @@ function startEditMeta(metaId) {
   document.getElementById('m-cat').value = meta.catId || '';
   document.getElementById('m-titulo').value = meta.titulo || '';
   document.getElementById('m-alvo').value = meta.alvo || '';
-  document.getElementById('m-unidade').value = meta.unidade === 'paginas' ? 'vezes' : (meta.unidade || 'horas');
+  const unidadeAtual = meta.unidade === 'paginas' ? 'vezes' : (meta.unidade === 'min' ? 'horas' : (meta.unidade || 'horas'));
+  document.getElementById('m-unidade').value = unidadeAtual;
   document.getElementById('m-prazo').value = meta.prazo || 'mensal';
   syncMetasUI();
 }

@@ -12,7 +12,7 @@ const WEEKDAY_OPTIONS = [
   { value: 7, label: 'Dom' },
 ];
 
-/* Estrutura principal dos dados. Esta Ã© a base que depois pode ser migrada para banco. */
+/* Estrutura principal dos dados. Esta é a base que depois pode ser migrada para banco. */
 function createId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -159,7 +159,7 @@ function validateTimeRange(start, end, contextLabel) {
 
   if (startMinutes === null || endMinutes === null) return;
   if (endMinutes <= startMinutes) {
-    throw new Error(`${contextLabel} nÃ£o pode terminar no dia seguinte. Ajuste o horÃ¡rio final para antes de 00:00.`);
+    throw new Error(`${contextLabel} não pode terminar no dia seguinte. Ajuste o horário final para antes de 00:00.`);
   }
 }
 
@@ -205,7 +205,7 @@ function loadLastRolloverDate() {
   try {
     return localStorage.getItem(APP_LAST_ROLLOVER_KEY) || getToday();
   } catch (error) {
-    console.error('Erro ao carregar a Ãºltima data processada.', error);
+    console.error('Erro ao carregar a última data processada.', error);
     return getToday();
   }
 }
@@ -214,7 +214,7 @@ function saveLastRolloverDate(dateStr) {
   try {
     localStorage.setItem(APP_LAST_ROLLOVER_KEY, dateStr);
   } catch (error) {
-    console.error('Erro ao salvar a Ãºltima data processada.', error);
+    console.error('Erro ao salvar a última data processada.', error);
   }
 }
 
@@ -294,7 +294,9 @@ function getMetaProgress(metaId, prazo, referenceDate = getToday()) {
         .filter(registro => registro.tarefaId === tarefa.id && registro.status === 'feito' && registro.data >= start && registro.data <= end)
         .forEach(registro => {
           if (meta.unidade === 'vezes') {
-            total += 1;
+            total += registro.valor || 1;
+          } else if (meta.unidade === 'km') {
+            total += registro.valor || 0;
           } else if (registro.duracaoMinutos) {
             total += minutesToDecimalHours(registro.duracaoMinutos);
           } else if (tarefa.inicio && tarefa.fim) {

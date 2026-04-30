@@ -15,6 +15,7 @@ async function loadPage(name) {
 
 async function switchTab(name, button) {
   if (uiState.paginaAtual === name) return;
+  closeAllForms();
   uiState.paginaAtual = name;
 
   document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));

@@ -56,6 +56,38 @@ const dataService = {
     schedulePersist();
   },
 
+  saveTaskValue(taskId, dateKey, valor) {
+    const tarefa = store.tarefas.find(item => item.id === taskId);
+    if (!tarefa) throw new Error('Tarefa não encontrada para registrar valor.');
+
+    const registroKey = getTaskProgressKey(tarefa, dateKey);
+    let registro = store.registros.find(item => item.tarefaId === taskId && item.data === registroKey);
+
+    if (!registro) {
+      registro = {
+        id: createId(),
+        tarefaId: taskId,
+        data: registroKey,
+        completedDate: dateKey,
+        status: 'feito',
+        completedAt: formatCurrentTime(),
+        valor,
+      };
+      store.registros.push(registro);
+    } else {
+      registro.valor = valor;
+      if (!registro.status) {
+        registro.status = 'feito';
+        registro.completedDate = dateKey;
+        registro.completedAt = formatCurrentTime();
+      } else if (registro.status === 'feito' && !registro.completedDate) {
+        registro.completedDate = dateKey;
+      }
+    }
+
+    schedulePersist();
+  },
+
   saveTaskDuration(taskId, dateKey, durationMinutes) {
     const tarefa = store.tarefas.find(item => item.id === taskId);
     if (!tarefa) throw new Error('Tarefa não encontrada para registrar duração.');

@@ -8,6 +8,7 @@ const uiState = {
   ultimoDiaRenderizado: getToday(),
   saveTimer: null,
   feedbackTimer: null,
+  feedbackBackdropAtivo: false,
   actionFeedbackTimer: null,
   progressoAnterior: {},
   buscaCompartilhada: '',
@@ -45,10 +46,13 @@ function updateSaveStatus(status, label) {
   if (text) text.textContent = label;
 }
 
-function showFeedback(type, message, keepVisible = false) {
+function showFeedback(type, message, keepVisible = false, lockBackdrop = type === 'success') {
   const banner = document.getElementById('feedback-banner');
   const text = document.getElementById('feedback-text');
   if (!banner || !text) return;
+
+  uiState.feedbackBackdropAtivo = Boolean(lockBackdrop);
+  syncFormBackdrop();
 
   banner.className = `banner show ${type}`;
   text.textContent = message;
@@ -59,8 +63,10 @@ function showFeedback(type, message, keepVisible = false) {
   uiState.feedbackTimer = setTimeout(() => {
     banner.className = 'banner';
     text.textContent = '';
+    uiState.feedbackBackdropAtivo = false;
+    syncFormBackdrop();
     uiState.feedbackTimer = null;
-  }, 4200);
+  }, 2000);
 }
 
 function showActionFeedback(type, message, anchor = document.activeElement, keepVisible = false) {
@@ -108,3 +114,62 @@ function flushPersist() {
   uiState.saveTimer = null;
   persistNow();
 }
+
+function setFormOpen(formEl, open) {
+  if (!formEl) return;
+  if (open) {
+    formEl.style.display = '';
+    requestAnimationFrame(() => {
+      if (formEl.style.display !== 'none') formEl.classList.add('is-open');
+      syncFormBackdrop();
+    });
+  } else {
+    formEl.classList.remove('is-open');
+    formEl.style.display = 'none';
+  }
+  syncFormBackdrop();
+}
+
+function hasOpenForm() {
+  return Boolean(
+    document.querySelector('.task-form-card.is-open') ||
+    uiState.rotinaFormularioAberto ||
+    uiState.categoriaFormularioAberto ||
+    uiState.metaFormularioAberto
+  );
+}
+
+function syncFormBackdrop() {
+  const backdrop = document.getElementById('form-backdrop');
+  if (!backdrop) return;
+  const anyOpen = hasOpenForm() || uiState.feedbackBackdropAtivo;
+  backdrop.classList.toggle('is-active', anyOpen);
+  document.body.classList.toggle('has-form-open', anyOpen);
+}
+
+function closeAllForms() {
+  document.querySelectorAll('.task-form-card.is-open').forEach(form => {
+    form.classList.remove('is-open');
+    form.style.display = 'none';
+  });
+  uiState.rotinaFormularioAberto = false;
+  uiState.categoriaFormularioAberto = false;
+  uiState.metaFormularioAberto = false;
+  uiState.editandoTarefaId = null;
+  uiState.editandoCategoriaId = null;
+  uiState.editandoMetaId = null;
+  syncFormBackdrop();
+}
+
+function onBackdropClick() {
+  if (!hasOpenForm()) return;
+  closeAllForms();
+  if (uiState.paginaAtual === 'rotina' && typeof renderRotina === 'function') renderRotina();
+  if (uiState.paginaAtual === 'metas' && typeof renderMetas === 'function') renderMetas();
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && hasOpenForm()) {
+    onBackdropClick();
+  }
+});

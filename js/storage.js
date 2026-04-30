@@ -38,7 +38,12 @@ function normalizeState(raw) {
 
   base.categorias = Array.isArray(raw.categorias) ? raw.categorias : [];
   base.metas = Array.isArray(raw.metas)
-    ? raw.metas.map(meta => ({ ...meta, unidade: meta?.unidade === 'paginas' ? 'vezes' : meta?.unidade }))
+    ? raw.metas.map(meta => {
+        let unidade = meta?.unidade;
+        if (unidade === 'paginas') unidade = 'vezes';
+        if (unidade === 'min') unidade = 'horas';
+        return { ...meta, unidade };
+      })
     : [];
   base.tarefas = Array.isArray(raw.tarefas) ? raw.tarefas.map(normalizeTask) : [];
   base.registros = Array.isArray(raw.registros) ? raw.registros : [];
