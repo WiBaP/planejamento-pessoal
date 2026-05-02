@@ -5,7 +5,7 @@ function createInitialState() {
     tarefas: [],
     registros: [],
     sessoes: [],
-    transacoes: [],
+    mercadoItens: [],
   };
 }
 
@@ -32,6 +32,18 @@ function normalizeTask(raw) {
   };
 }
 
+function normalizeMarketItem(raw) {
+  const quantidade = Number(raw?.quantidade || 1);
+
+  return {
+    id: raw?.id || createId(),
+    nome: raw?.nome || '',
+    quantidade: Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 1,
+    status: raw?.status === 'faltando' ? 'faltando' : 'ok',
+    criadoEm: raw?.criadoEm || getToday(),
+  };
+}
+
 function normalizeState(raw) {
   const base = createInitialState();
   if (!raw || typeof raw !== 'object') return base;
@@ -48,7 +60,7 @@ function normalizeState(raw) {
   base.tarefas = Array.isArray(raw.tarefas) ? raw.tarefas.map(normalizeTask) : [];
   base.registros = Array.isArray(raw.registros) ? raw.registros : [];
   base.sessoes = Array.isArray(raw.sessoes) ? raw.sessoes : [];
-  base.transacoes = Array.isArray(raw.transacoes) ? raw.transacoes : [];
+  base.mercadoItens = Array.isArray(raw.mercadoItens) ? raw.mercadoItens.map(normalizeMarketItem) : [];
   return base;
 }
 

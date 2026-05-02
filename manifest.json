@@ -1,7 +1,7 @@
 {
   "name": "Planejamento",
   "short_name": "Planejamento",
-  "description": "App pessoal de planejamento, rotina, metas e financeiro",
+  "description": "App pessoal de planejamento, rotina, metas e lista de mercado",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -173,13 +173,28 @@ const dataService = {
     schedulePersist();
   },
 
-  addTransaction(payload) {
-    store.transacoes.push({ id: createId(), ...payload });
+  addMarketItem(payload) {
+    store.mercadoItens.push(normalizeMarketItem({ id: createId(), ...payload }));
     schedulePersist();
   },
 
-  deleteTransaction(transactionId) {
-    store.transacoes = store.transacoes.filter(item => item.id !== transactionId);
+  updateMarketItemStatus(itemId, status) {
+    const item = store.mercadoItens.find(entry => entry.id === itemId);
+    if (!item) throw new Error('Item nao encontrado na lista de mercado.');
+    item.status = status === 'faltando' ? 'faltando' : 'ok';
+    schedulePersist();
+  },
+
+  updateMarketItemQuantity(itemId, quantidade) {
+    const item = store.mercadoItens.find(entry => entry.id === itemId);
+    if (!item) throw new Error('Item nao encontrado na lista de mercado.');
+    const nextQuantity = Number(quantidade || 1);
+    item.quantidade = Number.isFinite(nextQuantity) && nextQuantity > 0 ? nextQuantity : 1;
+    schedulePersist();
+  },
+
+  deleteMarketItem(itemId) {
+    store.mercadoItens = store.mercadoItens.filter(item => item.id !== itemId);
     schedulePersist();
   },
 };

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'planejamento-v1';
+const CACHE_VERSION = 'planejamento-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -10,11 +10,11 @@ const ASSETS = [
   'js/dataService.js',
   'js/rotina.js',
   'js/metas.js',
-  'js/financeiro.js',
+  'js/mercado.js',
   'js/app.js',
   'pages/rotina.html',
   'pages/metas.html',
-  'pages/financeiro.html',
+  'pages/mercado.html',
   'icons/icon-192.png',
   'icons/icon-512.png'
 ];

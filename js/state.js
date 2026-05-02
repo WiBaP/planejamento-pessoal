@@ -71,7 +71,7 @@ function showFeedback(type, message, keepVisible = false, lockBackdrop = type ==
 
 function showActionFeedback(type, message, anchor = document.activeElement, keepVisible = false) {
   const anchorElement = anchor instanceof Element ? anchor : null;
-  const target = anchorElement?.closest('.form-row, .task-item, .meta-item, .tx-row, .routine-toolbar-actions, .card');
+  const target = anchorElement?.closest('.form-row, .task-item, .meta-item, .market-row, .routine-toolbar-actions, .card');
   if (!target) {
     showFeedback(type, message, keepVisible);
     return;

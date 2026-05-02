@@ -33,7 +33,7 @@ async function switchTab(name, button) {
 function renderCurrentPage() {
   if (uiState.paginaAtual === 'rotina') renderRotina();
   if (uiState.paginaAtual === 'metas') renderMetas();
-  if (uiState.paginaAtual === 'financeiro') renderFinanceiro();
+  if (uiState.paginaAtual === 'mercado') renderMercado();
 }
 
 function checkDayChange() {

@@ -1,6 +1,6 @@
 # Planejamento Pessoal
 
-App de planejamento pessoal com areas de Rotina, Metas e Financeiro.
+App de planejamento pessoal com areas de Rotina, Metas e Mercado.
 
 ## Tecnologias
 
